@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>IDX Financial Report Finder (Proxy)</title>
+  <style>
+    :root{
+      --bg:#0b0f17; --text:#e5e7eb; --muted:#94a3b8;
+      --card:rgba(17,24,39,.62); --line:rgba(148,163,184,.16);
+      --accent:#60a5fa; --ok:#34d399; --err:#fb7185;
+      --shadow:0 10px 28px rgba(0,0,0,.35);
+      --r:16px;
+      --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+      --sans:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;font-family:var(--sans);color:var(--text);min-height:100vh;
+      background:
+        radial-gradient(1100px 520px at 18% 0%, rgba(96,165,250,.16), transparent 45%),
+        radial-gradient(900px 480px at 92% 10%, rgba(52,211,153,.12), transparent 42%),
+        var(--bg);
+    }
+    a{color:inherit}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px}
+    header{
+      display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    h1{margin:0;font-size:18px;font-weight:900;letter-spacing:.2px}
+    .sub{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.4}
+    .card{
+      border-radius:var(--r);
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--line);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .pill{
+      font-size:12px;padding:7px 10px;border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(17,24,39,.45); color:var(--muted);
+      display:inline-flex;gap:8px;align-items:center;
+    }
+    .dot{width:9px;height:9px;border-radius:99px;background:rgba(148,163,184,.6)}
+    .dot.ok{background:rgba(52,211,153,.88)}
+    .dot.err{background:rgba(251,113,133,.92)}
+    .dot.load{background:rgba(96,165,250,.92)}
+
+    /* controls */
+    .controls{padding:14px}
+    label{display:block;font-size:12px;color:var(--muted);margin:0 0 6px 2px}
+    .input, select{
+      width:100%;
+      padding:11px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(17,24,39,.55);
+      color:var(--text);
+      outline:none;
+    }
+    .input:focus, select:focus{
+      border-color:rgba(96,165,250,.62);
+      box-shadow:0 0 0 4px rgba(96,165,250,.12);
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1.2fr .75fr .75fr .75fr;
+      gap:10px;
+    }
+    @media (max-width:900px){ .grid{grid-template-columns:1fr 1fr} }
+    @media (max-width:520px){ .grid{grid-template-columns:1fr} }
+
+    .row{
+      display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+      justify-content:space-between;margin-top:12px;
+    }
+    .btn{
+      border:1px solid var(--line);
+      background:rgba(17,24,39,.78);
+      color:var(--text);
+      padding:10px 12px;border-radius:14px;
+      cursor:pointer;transition:.15s transform,.15s opacity,.15s border-color;
+      user-select:none;
+    }
+    .btn:hover{border-color:rgba(96,165,250,.6)}
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{
+      background:linear-gradient(180deg, rgba(96,165,250,.22), rgba(96,165,250,.12));
+      border-color:rgba(96,165,250,.45);
+    }
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .small{font-size:12px;color:var(--muted)}
+    .errBox{
+      margin-top:12px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid rgba(251,113,133,.35);
+      background:rgba(251,113,133,.08);
+      color:#fecdd3;
+      display:none;
+      white-space:pre-wrap;
+    }
+    .hint{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.4}
+
+    /* results */
+    .resultHead{
+      display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+      padding:14px 14px 10px;
+    }
+    .resultHead h2{margin:0;font-size:14px;font-weight:900}
+    .tableWrap{overflow:auto;border-top:1px solid var(--line)}
+    table{width:100%;border-collapse:collapse;min-width:920px}
+    th,td{padding:12px 14px;border-bottom:1px solid rgba(148,163,184,.12);vertical-align:top;font-size:13px}
+    th{
+      position:sticky;top:0;z-index:1;
+      background:rgba(11,15,23,.86);backdrop-filter:blur(8px);
+      color:#cbd5e1;font-weight:900;
+    }
+    .k{font-family:var(--mono);font-weight:900;letter-spacing:.3px}
+
+    /* attachment item (desktop table) */
+    .attachments{display:flex;flex-direction:column;gap:8px}
+    .file{
+      display:flex;align-items:center;gap:10px;
+      padding:9px 10px;border-radius:14px;
+      border:1px solid rgba(148,163,184,.16);
+      background:rgba(17,24,39,.45);
+      min-width:0;
+    }
+    .file a{
+      min-width:0;
+      flex:1;
+      text-decoration:none;
+      color:#dbeafe;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      display:block;
+    }
+    .tag{
+      flex:0 0 auto;
+      font-size:11px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,.18);
+      color:var(--muted);
+      white-space:nowrap;
+    }
+
+    /* mobile cards */
+    .cards{display:none;padding:14px;gap:12px}
+    @media (max-width:860px){
+      .tableWrap{display:none}
+      .cards{display:grid}
+      table{min-width:0}
+    }
+    .item{
+      border:1px solid rgba(148,163,184,.14);
+      background:rgba(17,24,39,.40);
+      border-radius:16px;
+      padding:14px;
+      overflow:hidden; /* important: prevent attachment overflow */
+    }
+    .itemTop{
+      display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .name{font-size:14px;font-weight:950;line-height:1.25}
+    .code{
+      font-family:var(--mono);
+      font-weight:950;
+      color:#bfdbfe;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(96,165,250,.25);
+      background:rgba(96,165,250,.10);
+      white-space:nowrap;
+    }
+    .metaRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .meta{
+      font-size:12px;
+      padding:7px 10px;border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(17,24,39,.35);
+      color:var(--muted);
+      display:inline-flex;gap:8px;align-items:center;
+    }
+
+    /* mobile attachment accordion */
+    details.acc{
+      margin-top:12px;
+      border:1px solid rgba(148,163,184,.14);
+      border-radius:14px;
+      background:rgba(17,24,39,.30);
+      overflow:hidden;
+    }
+    summary.accHead{
+      list-style:none;
+      cursor:pointer;
+      padding:10px 12px;
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      user-select:none;
+    }
+    summary.accHead::-webkit-details-marker{display:none}
+    .chev{
+      width:10px;height:10px;border-right:2px solid rgba(226,232,240,.7);border-bottom:2px solid rgba(226,232,240,.7);
+      transform:rotate(-45deg);
+      transition:.18s transform;
+      flex:0 0 auto;
+    }
+    details[open] .chev{transform:rotate(45deg)}
+    .accBody{padding:10px 12px;border-top:1px solid rgba(148,163,184,.12)}
+    .attGrid{display:grid;grid-template-columns:1fr;gap:8px}
+    .fileM{
+      display:flex;gap:10px;align-items:center;
+      padding:10px 10px;border-radius:14px;
+      border:1px solid rgba(148,163,184,.14);
+      background:rgba(17,24,39,.45);
+      min-width:0;
+    }
+    .fileM a{
+      flex:1;
+      min-width:0;
+      text-decoration:none;
+      color:#dbeafe;
+      display:-webkit-box;
+      -webkit-line-clamp:2; /* <= fix long filename on mobile */
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+      line-height:1.25;
+      white-space:normal;
+      word-break:break-word;
+    }
+    .tagM{flex:0 0 auto;font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid rgba(148,163,184,.18);color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>IDX Financial Report Finder</h1>
+        <p class="sub">Fetch data IDX lewat proxy (anti-CORS). UI sudah dibenerin untuk mobile (list PDF aman).</p>
+      </div>
+      <div class="pill">
+        <span class="dot" id="netDot"></span>
+        <span id="netText">Siap</span>
+      </div>
+    </header>
+
+    <section class="card controls">
+      <div class="grid">
+        <div>
+          <label for="kode">Kode Emiten (opsional)</label>
+          <input class="input" id="kode" placeholder="contoh: AALI / BBCA / TLKM" maxlength="20" />
+        </div>
+
+        <div>
+          <label for="year">Tahun</label>
+          <input class="input" id="year" type="number" min="2000" max="2100" value="2020" />
+        </div>
+
+        <div>
+          <label for="pagesize">Page Size</label>
+          <select id="pagesize">
+            <option value="12" selected>12</option>
+            <option value="24">24</option>
+            <option value="48">48</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="periode">Periode</label>
+          <select id="periode">
+            <option value="audit" selected>Audit</option>
+            <option value="tw1">TW1</option>
+            <option value="tw2">TW2</option>
+            <option value="tw3">TW3</option>
+            <option value="tahunan">Tahunan</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="reportType">Report Type</label>
+          <select id="reportType">
+            <option value="rdf" selected>rdf</option>
+            <option value="fs">fs</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="emitenType">Emiten Type</label>
+          <select id="emitenType">
+            <option value="s" selected>S (Saham)</option>
+            <option value="b">B (Obligasi)</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="sortOrder">Urutan</label>
+          <select id="sortOrder">
+            <option value="asc" selected>A-Z</option>
+            <option value="desc">Z-A</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="proxyPick">Proxy</label>
+          <select id="proxyPick">
+            <option value="cf" selected>Cloudflare CORS Anywhere</option>
+            <option value="codetabs">CodeTabs</option>
+          </select>
+          <div class="hint">Jika proxy error/limit, ganti ke yang lain.</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="btn primary" id="btnCari">Cari</button>
+          <button class="btn" id="btnReset">Reset</button>
+          <span class="small" id="summary"></span>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="btn" id="btnPrev">← Prev</button>
+          <span class="pill"><span class="dot ok"></span><span id="pageInfo">Page 1</span></span>
+          <button class="btn" id="btnNext">Next →</button>
+        </div>
+      </div>
+
+      <div class="errBox" id="errBox"></div>
+    </section>
+
+    <section class="card" style="margin-top:14px">
+      <div class="resultHead">
+        <h2>Hasil</h2>
+        <span class="small muted" id="countInfo">Belum ada data.</span>
+      </div>
+
+      <div class="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:120px">Kode</th>
+              <th style="width:280px">Nama Emiten</th>
+              <th style="width:120px">Tahun</th>
+              <th style="width:170px">Modified</th>
+              <th>Attachments</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td colspan="5" class="muted">Belum ada data. Klik "Cari".</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="cards" id="cards"></div>
+    </section>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  const IDX_ORIGIN = "https://www.idx.co.id";
+  const IDX_API = IDX_ORIGIN + "/primary/ListedCompany/GetFinancialReport";
+
+  const PROXIES = {
+    cf: { name: "Cloudflare CORS Anywhere", build: (rawUrl) =>
+      "https://cloudflare-cors-anywhere.queakchannel42.workers.dev/?" + encodeURIComponent(rawUrl)
+    },
+    codetabs: { name: "CodeTabs", build: (rawUrl) =>
+      "https://api.codetabs.com/v1/proxy?quest=" + rawUrl
+    }
+  };
+
+  const netDot = $("netDot");
+  const netText = $("netText");
+  const errBox = $("errBox");
+  const tbody = $("tbody");
+  const cards = $("cards");
+  const countInfo = $("countInfo");
+  const pageInfo = $("pageInfo");
+  const summary = $("summary");
+
+  const inputKode = $("kode");
+  const inputYear = $("year");
+  const selPageSize = $("pagesize");
+  const selPeriode = $("periode");
+  const selReportType = $("reportType");
+  const selEmitenType = $("emitenType");
+  const selSortOrder = $("sortOrder");
+  const selProxyPick = $("proxyPick");
+
+  const btnCari = $("btnCari");
+  const btnReset = $("btnReset");
+  const btnPrev = $("btnPrev");
+  const btnNext = $("btnNext");
+
+  const state = { indexFrom: 1, pageSize: 12, resultCount: 0, loading: false, lastFilterKey: "" };
+
+  const safeText = (v) => (v == null ? "" : String(v));
+  const escapeHtml = (s) => safeText(s)
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+
+  const fmtDate = (iso) => {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "-";
+    const pad = (n) => String(n).padStart(2,"0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const fmtSize = (bytes) => {
+    const n = Number(bytes);
+    if (!Number.isFinite(n)) return "";
+    if (n < 1024) return `${n} B`;
+    const kb = n / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
+  };
+
+  const setNet = (type, text) => {
+    netDot.className = "dot " + (type || "");
+    netText.textContent = text;
+  };
+
+  const setError = (msg) => {
+    if (!msg) { errBox.style.display="none"; errBox.textContent=""; return; }
+    errBox.style.display="block";
+    errBox.textContent = msg;
+  };
+
+  const setLoading = (v) => {
+    state.loading = v;
+    [btnCari, btnReset, btnPrev, btnNext].forEach(b => b.disabled = v);
+    setNet(v ? "load" : "ok", v ? "Memuat..." : "Siap");
+  };
+
+  const buildUrl = (p) => {
+    const u = new URL(IDX_API);
+    u.searchParams.set("indexFrom", String(p.indexFrom));
+    u.searchParams.set("pageSize", String(p.pageSize));
+    u.searchParams.set("year", String(p.year));
+    u.searchParams.set("reportType", p.reportType);
+    u.searchParams.set("EmitenType", p.emitenType);
+    u.searchParams.set("periode", p.periode);
+    u.searchParams.set("kodeEmiten", p.kodeEmiten || "");
+    u.searchParams.set("SortColumn", "KodeEmiten");
+    u.searchParams.set("SortOrder", p.sortOrder);
+    return u.toString();
+  };
+
+  const attachmentLink = (filePath) => {
+    if (!filePath) return "#";
+    if (String(filePath).startsWith("http")) return String(filePath);
+    return IDX_ORIGIN + String(filePath);
+  };
+
+  const renderEmpty = (text) => {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">${escapeHtml(text || "Tidak ada data.")}</td></tr>`;
+    cards.innerHTML = `<div class="muted">${escapeHtml(text || "Tidak ada data.")}</div>`;
+  };
+
+  const totalPages = () => {
+    const ps = state.pageSize || 12;
+    const rc = state.resultCount || 0;
+    return Math.max(1, Math.ceil(rc / ps));
+  };
+
+  const currentPage = () => {
+    const ps = state.pageSize || 12;
+    return Math.floor((state.indexFrom - 1) / ps) + 1;
+  };
+
+  const updatePager = () => {
+    const cp = currentPage();
+    const tp = totalPages();
+    pageInfo.textContent = `Page ${cp} / ${tp}`;
+    btnPrev.disabled = state.loading || cp <= 1;
+    btnNext.disabled = state.loading || cp >= tp;
+  };
+
+  const getParams = () => {
+    const kode = safeText(inputKode.value).trim().toUpperCase();
+    const year = Number(inputYear.value) || 2020;
+    const pageSize = Number(selPageSize.value) || 12;
+    return {
+      indexFrom: state.indexFrom,
+      pageSize,
+      year,
+      reportType: selReportType.value || "rdf",
+      emitenType: selEmitenType.value || "s",
+      periode: selPeriode.value || "audit",
+      kodeEmiten: kode || "",
+      sortOrder: selSortOrder.value || "asc",
+      proxyKey: selProxyPick.value || "cf"
+    };
+  };
+
+  const filterKey = (p) => [p.pageSize,p.year,p.reportType,p.emitenType,p.periode,p.kodeEmiten,p.sortOrder,p.proxyKey].join("|");
+
+  async function fetchReports(resetIndex=false){
+    setError("");
+    if (resetIndex) state.indexFrom = 1;
+
+    const p = getParams();
+    state.pageSize = p.pageSize;
+
+    const fk = filterKey(p);
+    if (state.lastFilterKey && state.lastFilterKey !== fk){
+      state.indexFrom = 1;
+      p.indexFrom = 1;
+    }
+    state.lastFilterKey = fk;
+    p.indexFrom = state.indexFrom;
+
+    const rawUrl = buildUrl(p);
+    const proxy = PROXIES[p.proxyKey] || PROXIES.cf;
+    const url = proxy.build(rawUrl);
+
+    setLoading(true);
+
+    try{
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { "accept": "application/json, text/plain, */*" },
+        cache: "no-store"
+      });
+      if(!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+      const data = await res.json();
+      const results = Array.isArray(data?.Results) ? data.Results : [];
+      const rc = Number(data?.ResultCount);
+      state.resultCount = Number.isFinite(rc) ? rc : results.length;
+
+      const cp = currentPage();
+      const tp = totalPages();
+      countInfo.textContent = `Menampilkan ${results.length} data • Total: ${state.resultCount} • Page ${cp}/${tp}`;
+      summary.textContent = `Proxy: ${proxy.name} • Filter: ${p.year}, ${p.periode}, ${p.reportType}${p.kodeEmiten ? ", " + p.kodeEmiten : ""}`;
+
+      if(!results.length){
+        renderEmpty("Data tidak ditemukan untuk filter ini.");
+        setNet("ok","Berhasil (kosong)");
+        updatePager();
+        return;
+      }
+
+      // Desktop table
+      tbody.innerHTML = results.map(item => {
+        const kode = escapeHtml(item?.KodeEmiten);
+        const nama = escapeHtml(item?.NamaEmiten);
+        const year = escapeHtml(item?.Report_Year || p.year);
+        const modified = escapeHtml(fmtDate(item?.File_Modified));
+        const rp = escapeHtml(item?.Report_Period || p.periode);
+
+        const atts = Array.isArray(item?.Attachments) ? item.Attachments : [];
+        const attHtml = atts.slice(0, 15).map(a => {
+          const name = escapeHtml(a?.File_Name || "file");
+          const link = attachmentLink(a?.File_Path);
+          const type = escapeHtml(a?.File_Type || "");
+          const size = escapeHtml(fmtSize(a?.File_Size));
+          return `
+            <div class="file">
+              <a href="${link}" target="_blank" rel="noopener noreferrer" title="${name}">${name}</a>
+              <span class="tag">${type || "file"}${size ? " • " + size : ""}</span>
+            </div>
+          `;
+        }).join("");
+
+        return `
+          <tr>
+            <td><span class="k">${kode}</span></td>
+            <td>
+              <div style="font-weight:950">${nama}</div>
+              <div class="muted" style="margin-top:4px">Periode: ${rp}</div>
+            </td>
+            <td>${year}</td>
+            <td>${modified}</td>
+            <td><div class="attachments">${attHtml || `<span class="muted">Tidak ada attachment.</span>`}</div></td>
+          </tr>
+        `;
+      }).join("");
+
+      // Mobile cards + accordion attachments
+      cards.innerHTML = results.map((item, idx) => {
+        const kode = escapeHtml(item?.KodeEmiten);
+        const nama = escapeHtml(item?.NamaEmiten);
+        const year = escapeHtml(item?.Report_Year || p.year);
+        const modified = escapeHtml(fmtDate(item?.File_Modified));
+        const rp = escapeHtml(item?.Report_Period || p.periode);
+
+        const atts = Array.isArray(item?.Attachments) ? item.Attachments : [];
+        const attCount = atts.length;
+
+        const attHtml = atts.slice(0, 25).map(a => {
+          const name = escapeHtml(a?.File_Name || "file");
+          const link = attachmentLink(a?.File_Path);
+          const type = escapeHtml(a?.File_Type || "");
+          const size = escapeHtml(fmtSize(a?.File_Size));
+          return `
+            <div class="fileM">
+              <a href="${link}" target="_blank" rel="noopener noreferrer" title="${name}">${name}</a>
+              <span class="tagM">${type || "file"}${size ? " • " + size : ""}</span>
+            </div>
+          `;
+        }).join("");
+
+        return `
+          <div class="item">
+            <div class="itemTop">
+              <div>
+                <div class="name">${nama}</div>
+                <div class="muted" style="margin-top:4px">${rp} • ${year}</div>
+                <div class="metaRow">
+                  <div class="meta"><span class="dot ok"></span><span>Modified: ${modified}</span></div>
+                </div>
+              </div>
+              <div class="code">${kode}</div>
+            </div>
+
+            <details class="acc" ${idx === 0 ? "open" : ""}>
+              <summary class="accHead">
+                <span style="display:flex;gap:10px;align-items:center;min-width:0">
+                  <span class="pill" style="border-color:rgba(96,165,250,.25);background:rgba(96,165,250,.08);color:#cfe6ff">
+                    Lampiran
+                  </span>
+                  <span class="small" style="color:var(--muted)">${attCount} file</span>
+                </span>
+                <span class="chev"></span>
+              </summary>
+              <div class="accBody">
+                <div class="attGrid">
+                  ${attHtml || `<div class="muted">Tidak ada attachment.</div>`}
+                </div>
+              </div>
+            </details>
+          </div>
+        `;
+      }).join("");
+
+      setNet("ok","Berhasil");
+      updatePager();
+    } catch(e){
+      console.error(e);
+      setNet("err","Gagal");
+      renderEmpty("Gagal memuat data.");
+      updatePager();
+      const msg = String(e?.message || e);
+      setError(
+        `Error: ${msg}\n` +
+        `Tips: ganti Proxy (CF / CodeTabs). Bisa kena limit atau sedang down.`
+      );
+    } finally {
+      setLoading(false);
+      updatePager();
+    }
+  }
+
+  async function prev(){
+    const ps = state.pageSize || 12;
+    state.indexFrom = Math.max(1, state.indexFrom - ps);
+    await fetchReports(false);
+  }
+  async function next(){
+    const ps = state.pageSize || 12;
+    const maxIndexFrom = (totalPages() - 1) * ps + 1;
+    state.indexFrom = Math.min(state.indexFrom + ps, maxIndexFrom);
+    await fetchReports(false);
+  }
+
+  async function resetAll(){
+    inputKode.value = "";
+    inputYear.value = 2020;
+    selPageSize.value = "12";
+    selPeriode.value = "audit";
+    selReportType.value = "rdf";
+    selEmitenType.value = "s";
+    selSortOrder.value = "asc";
+    selProxyPick.value = "cf";
+    state.indexFrom = 1; state.pageSize = 12; state.resultCount = 0; state.lastFilterKey = "";
+    setError("");
+    summary.textContent = "";
+    countInfo.textContent = "Belum ada data.";
+    renderEmpty('Belum ada data. Klik "Cari".');
+    updatePager();
+    setNet("ok","Siap");
+  }
+
+  // debounce search kode emiten
+  let t=null;
+  inputKode.addEventListener("input", () => {
+    clearTimeout(t);
+    t=setTimeout(() => fetchReports(true), 450);
+  });
+
+  btnCari.addEventListener("click", () => fetchReports(true));
+  btnReset.addEventListener("click", resetAll);
+  btnPrev.addEventListener("click", prev);
+  btnNext.addEventListener("click", next);
+
+  [inputYear, selPageSize, selPeriode, selReportType, selEmitenType, selSortOrder, selProxyPick]
+    .forEach(el => el.addEventListener("change", () => fetchReports(true)));
+
+  // init
+  setNet("ok","Siap");
+  renderEmpty('Belum ada data. Klik "Cari".');
+  updatePager();
+})();
+</script>
+</body>
+</html>
